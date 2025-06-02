@@ -1,1 +1,31 @@
+{{ define "main" }}
+  <div class="w-full max-w-md bg-white rounded-md shadow-md p-4">
+    <!-- Input form to create a new to-do -->
+    <form
+      hx-post="/tasks"
+      hx-target="#todoList"
+      hx-swap="afterbegin"
+      class="flex mb-4"
+    >
+      <input
+        type="text"
+        name="title"
+        placeholder="What needs to be done?"
+        class="flex-1 border rounded-l px-3 py-2"
+        required
+      />
+      <button type="submit" class="bg-blue-500 text-white px-4 rounded-r">
+        Add
+      </button>
+    </form>
 
+    <!-- Container for the full list of to-dos -->
+    <ul id="todoList">
+      {{ if .ToDos }}
+        {{ template "partials/todo_list.html" .ToDos }}
+      {{ else }}
+        <li class="text-gray-500 text-center py-2">No to-dos yet!</li>
+      {{ end }}
+    </ul>
+  </div>
+{{ end }}
