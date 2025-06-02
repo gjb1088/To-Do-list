@@ -1,1 +1,44 @@
+{{ define "todo_item" }}
+<li
+  id="todo-{{ .ID }}"
+  class="flex items-center justify-between px-2 py-1 border-b"
+>
+  <!-- Checkbox to toggle “Completed” status -->
+  <div class="flex items-center">
+    <input
+      type="checkbox"
+      {{ if .Completed }} checked {{ end }}
+      class="mr-2"
+      hx-put="/tasks/{{ .ID }}"
+      hx-include="closest li"
+      hx-swap="outerHTML"
+    />
+    <span class="{{ if .Completed }} line-through text-gray-500 {{ end }}">
+      {{ .Title }}
+    </span>
+  </div>
 
+  <!-- Action buttons: Edit & Delete -->
+  <div class="flex items-center space-x-2">
+    <!-- Edit button triggers the inline edit form -->
+    <button
+      class="text-yellow-500 hover:text-yellow-700"
+      hx-get="/tasks/{{ .ID }}/edit"
+      hx-target="#todo-{{ .ID }}"
+      hx-swap="outerHTML"
+    >
+      ✏️
+    </button>
+
+    <!-- Delete button -->
+    <button
+      class="text-red-500 hover:text-red-700"
+      hx-delete="/tasks/{{ .ID }}"
+      hx-target="#todo-{{ .ID }}"
+      hx-swap="outerHTML"
+    >
+      🗑️
+    </button>
+  </div>
+</li>
+{{ end }}
