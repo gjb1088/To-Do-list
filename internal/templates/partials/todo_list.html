@@ -1,1 +1,7 @@
-
+{{/* 
+   Iterate through []*ToDo passed as “.” 
+   and include the `todo_item` template for each. 
+*/}}
+{{- range . }}
+  {{ template "partials/todo_item.html" . }}
+{{- end }}
