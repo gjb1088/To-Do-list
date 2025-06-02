@@ -1,0 +1,39 @@
+{{ define "edit_form" }}
+<li id="todo-{{ .ID }}" class="flex items-center justify-between px-2 py-1 border-b">
+  <form
+    hx-put="/tasks/{{ .ID }}"
+    hx-target="#todo-{{ .ID }}"
+    hx-swap="outerHTML"
+    class="flex flex-1"
+  >
+    <input
+      type="text"
+      name="title"
+      value="{{ .Title }}"
+      class="flex-1 border rounded-l px-2 py-1"
+      required
+    />
+    <label class="flex items-center mx-2">
+      <input
+        type="checkbox"
+        name="completed"
+        {{ if .Completed }} checked {{ end }}
+        class="mr-1"
+      />
+      Done
+    </label>
+    <button type="submit" class="bg-green-500 text-white px-3 rounded-r">
+      Save
+    </button>
+    <button
+      type="button"
+      class="ml-2 text-gray-600 hover:text-gray-800"
+      hx-get="/tasks/{{ .ID }}"
+      hx-target="#todo-{{ .ID }}"
+      hx-swap="outerHTML"
+    >
+      Cancel
+    </button>
+  </form>
+</li>
+{{ end }}
