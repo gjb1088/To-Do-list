@@ -160,3 +160,29 @@ func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// GetToDo handles GET "/tasks/{id}" (returns a single <li> for htmx)
+func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
+    idStr := r.URL.Path[len("/tasks/"):]
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+    todo, err := h.Store.Get(id)
+    if err != nil {
+        http.Error(w, "not found", http.StatusNotFound)
+        return
+    }
+
+    if r.Header.Get("HX-Request") == "true" {
+        // Return just the <li> snippet for this one item
+        if err := h.Templates.ExecuteTemplate(w, "partials/todo_item.html", todo); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // Fallback: redirect to full list
+    http.Redirect(w, r, "/", http.StatusSeeOther)
+}
