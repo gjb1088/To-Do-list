@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"your_module_path/internal/handlers"
-	"your_module_path/internal/models"
+	"github.com/gjb1088/To-Do-list/internal/handlers"
+	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
 func main() {
