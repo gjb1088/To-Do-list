@@ -1,3 +1,3 @@
 module github.com/gjb1088/todolist
 
-go 1.18.1
+go 1.23
