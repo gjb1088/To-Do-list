@@ -1,0 +1,6 @@
+{{ define "todo_completed_item.html" }}
+<li class="flex items-center px-2 py-1 border-b text-gray-500">
+  <input type="checkbox" checked disabled class="mr-2" />
+  <span class="line-through">{{ .Title }}</span>
+</li>
+{{ end }}
