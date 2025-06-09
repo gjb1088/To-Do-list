@@ -37,14 +37,27 @@ func NewHandler(store *models.Store) (*Handler, error) {
 
 // ServeIndex renders layout.html (which pulls in the "main" block from index.html)
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
-	todos := h.Store.GetAll()
-	data := struct {
-		ToDos []*models.ToDo
-	}{ToDos: todos}
+    all := h.Store.GetAll()
+    var active, completed []*models.ToDo
+    for _, t := range all {
+        if t.Completed {
+            completed = append(completed, t)
+        } else {
+            active = append(active, t)
+        }
+    }
 
-	if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+    data := struct {
+        Active    []*models.ToDo
+        Completed []*models.ToDo
+    }{
+        Active:    active,
+        Completed: completed,
+    }
+
+    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
 }
 
 // CreateToDo handles POST /tasks
@@ -165,4 +178,12 @@ func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// ClearCompleted handles DELETE /tasks/completed
+func (h *Handler) ClearCompleted(w http.ResponseWriter, r *http.Request) {
+    h.Store.ClearCompleted()
+    // Return an empty <ul> so htmx will wipe out the list
+    w.Header().Set("Content-Type", "text/html")
+    w.Write([]byte(`<ul id="completedList"></ul>`))
 }
