@@ -53,6 +53,14 @@ func main() {
 		}
 	})
 
+	http.HandleFunc("/tasks/completed", func(w http.ResponseWriter, r *http.Request) {
+    		if r.Method == http.MethodDelete {
+        		h.ClearCompleted(w, r)
+        	return
+    		}
+    		http.NotFound(w, r)
+	})
+
 	log.Println("Starting server on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal(err)
