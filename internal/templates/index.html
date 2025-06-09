@@ -1,31 +1,47 @@
 {{ define "main" }}
-  <div class="w-full max-w-md bg-white rounded-md shadow-md p-4">
-    <!-- Input form to create a new to-do -->
-    <form
-      hx-post="/tasks"
-      hx-target="#todoList"
-      hx-swap="afterbegin"
-      class="flex mb-4"
-    >
-      <input
-        type="text"
-        name="title"
-        placeholder="What needs to be done?"
-        class="flex-1 border rounded-l px-3 py-2"
-        required
-      />
-      <button type="submit" class="bg-blue-500 text-white px-4 rounded-r">
-        Add
-      </button>
-    </form>
+<div class="w-full max-w-md bg-white rounded shadow p-4">
 
-    <!-- Container for the full list of to-dos -->
-    <ul id="todoList">
-      {{ if .ToDos }}
-        {{ template "todo_list.html" .ToDos }}
-      {{ else }}
-        <li class="text-gray-500 text-center py-2">No to-dos yet!</li>
-      {{ end }}
-    </ul>
+  <!-- Active To-Do Form -->
+  <form hx-post="/tasks"
+        hx-target="#activeList"
+        hx-swap="afterbegin"
+        class="flex mb-4">
+    <input type="text" name="title" placeholder="What needs to be done?"
+           class="flex-1 border px-3 py-2 rounded-l" required>
+    <button type="submit" class="bg-blue-500 text-white px-4 rounded-r">Add</button>
+  </form>
+
+  <!-- Active Tasks -->
+  <h2 class="text-xl font-semibold mb-2">Active</h2>
+  <ul id="activeList">
+    {{ if .Active }}
+      {{ template "todo_list.html" .Active }}
+    {{ else }}
+      <li class="text-gray-500">No active tasks.</li>
+    {{ end }}
+  </ul>
+
+  <!-- Completed Tasks -->
+  <div class="mt-6">
+    <h2 class="text-xl font-semibold mb-2">Completed 🎉</h2>
+    <button
+      hx-delete="/tasks/completed"
+      hx-target="#completedSection"
+      hx-swap="outerHTML"
+      class="mb-2 text-red-600 hover:text-red-800"
+    >
+      Delete All
+    </button>
+    <div id="completedSection">
+      <ul id="completedList">
+        {{ if .Completed }}
+          {{ template "todo_completed_list.html" .Completed }}
+        {{ else }}
+          <li class="text-gray-500">No completed tasks.</li>
+        {{ end }}
+      </ul>
+    </div>
   </div>
+
+</div>
 {{ end }}
