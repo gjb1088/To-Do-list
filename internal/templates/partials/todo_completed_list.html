@@ -1,0 +1,5 @@
+{{ define "todo_completed_list.html" }}
+{{- range . }}
+  {{ template "todo_completed_item.html" . }}
+{{- end }}
+{{ end }}
