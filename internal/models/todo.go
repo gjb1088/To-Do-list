@@ -101,3 +101,14 @@ func (s *Store) Delete(id int) error {
 	delete(s.todos, id)
 	return nil
 }
+
+// ClearCompleted removes all tasks where Completed==true.
+func (s *Store) ClearCompleted() {
+    s.Lock()
+    defer s.Unlock()
+    for id, todo := range s.todos {
+        if todo.Completed {
+            delete(s.todos, id)
+        }
+    }
+}
