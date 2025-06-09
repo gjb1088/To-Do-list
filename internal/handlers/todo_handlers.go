@@ -9,32 +9,22 @@ import (
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
-// Handler holds the store and pre-parsed templates.
+// Handler holds the store and the parsed templates.
 type Handler struct {
 	Store     *models.Store
 	Templates *template.Template
 }
 
-// NewHandler parses templates and returns a Handler.
+// NewHandler loads all templates (layout, index, partials) and returns a Handler.
 func NewHandler(store *models.Store) (*Handler, error) {
-	// Parse all templates under internal/templates:
+	// 1) Load layout.html and index.html
 	tmpl, err := template.ParseGlob(filepath.Join("internal", "templates", "*.html"))
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse partials (if you split them into a subfolder):
-	partials, err := template.ParseGlob(filepath.Join("internal", "templates", "partials", "*.html"))
-	if err != nil {
-		return nil, err
-	}
-
-	// Combine them so that “layout.html” can reference partials:
-	tmpl, err = tmpl.Clone()
-	if err != nil {
-		return nil, err
-	}
-	tmpl, err = tmpl.AddParseTree("partials", partials.Tree)
+	// 2) Then load all the partials (todo_item.html, todo_list.html, edit_form.html)
+	tmpl, err = tmpl.ParseGlob(filepath.Join("internal", "templates", "partials", "*.html"))
 	if err != nil {
 		return nil, err
 	}
@@ -45,19 +35,15 @@ func NewHandler(store *models.Store) (*Handler, error) {
 	}, nil
 }
 
-// ServeIndex renders the full page (initial load).
+// ServeIndex renders layout.html (which pulls in the "main" block from index.html)
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
 	todos := h.Store.GetAll()
 	data := struct {
 		ToDos []*models.ToDo
-	}{
-		ToDos: todos,
-	}
+	}{ToDos: todos}
 
-	// layout.html should include index.html as the “main” block.
-	if err := h.Templates.ExecuteTemplate(w, "index.html", data); err != nil {
+	if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 
@@ -75,22 +61,20 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 
 	todo := h.Store.Create(title)
 
-	// If it’s an htmx request, we want to return just the single <li> snippet:
+	// If htmx, return only the <li> snippet
 	if r.Header.Get("HX-Request") == "true" {
-		// Render partial “todo_item.html” with this new item
-		if err := h.Templates.ExecuteTemplate(w, "partials/todo_item.html", todo); err != nil {
+		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	// Otherwise, redirect back to the index (full load)
+	// Otherwise full-page redirect
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // DeleteToDo handles DELETE /tasks/{id}
 func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
-	// Assume the URL path is /tasks/{id}, e.g. /tasks/3
 	idStr := r.URL.Path[len("/tasks/"):]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -102,7 +86,7 @@ func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For hx-delete, we return an empty 200 so htmx can remove the <li>.
+	// htmx will remove the <li> if we return 200 OK with empty body
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -128,9 +112,9 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If this is an htmx request for inline edit, return the updated <li>
+	// For htmx inline updates, return the new <li>
 	if r.Header.Get("HX-Request") == "true" {
-		if err := h.Templates.ExecuteTemplate(w, "partials/todo_item.html", updated); err != nil {
+		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -139,7 +123,7 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// EditFormToDo handles GET /tasks/{id}/edit → returns an <input> form snippet
+// EditFormToDo handles GET /tasks/{id}/edit and returns the inline edit form <li>
 func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Path[len("/tasks/") : len(r.URL.Path)-len("/edit")]
 	id, err := strconv.Atoi(idStr)
@@ -153,35 +137,32 @@ func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the snippet containing the inline edit form
-	if err := h.Templates.ExecuteTemplate(w, "partials/edit_form.html", todo); err != nil {
+	if err := h.Templates.ExecuteTemplate(w, "edit_form.html", todo); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 
-// GetToDo handles GET "/tasks/{id}" (returns a single <li> for htmx)
+// GetToDo handles GET /tasks/{id} and returns a single <li> for htmx swaps
 func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Path[len("/tasks/"):]
-    id, err := strconv.Atoi(idStr)
-    if err != nil {
-        http.Error(w, "invalid id", http.StatusBadRequest)
-        return
-    }
-    todo, err := h.Store.Get(id)
-    if err != nil {
-        http.Error(w, "not found", http.StatusNotFound)
-        return
-    }
+	idStr := r.URL.Path[len("/tasks/"):]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	todo, err := h.Store.Get(id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 
-    if r.Header.Get("HX-Request") == "true" {
-        // Return just the <li> snippet for this one item
-        if err := h.Templates.ExecuteTemplate(w, "partials/todo_item.html", todo); err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-        return
-    }
+	// Return just the <li> snippet
+	if r.Header.Get("HX-Request") == "true" {
+		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
 
-    // Fallback: redirect to full list
-    http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
