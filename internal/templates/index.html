@@ -22,7 +22,7 @@
     <!-- Container for the full list of to-dos -->
     <ul id="todoList">
       {{ if .ToDos }}
-        {{ template "partials/todo_list.html" .ToDos }}
+        {{ template "todo_list.html" .ToDos }}
       {{ else }}
         <li class="text-gray-500 text-center py-2">No to-dos yet!</li>
       {{ end }}
