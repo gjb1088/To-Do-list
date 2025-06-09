@@ -2,6 +2,8 @@
    Iterate through []*ToDo passed as “.” 
    and include the `todo_item` template for each. 
 */}}
+{{ define "todo_list.html" }}
 {{- range . }}
   {{ template "todo_item.html" . }}
 {{- end }}
+{{ end }}
