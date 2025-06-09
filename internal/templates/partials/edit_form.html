@@ -1,4 +1,4 @@
-{{ define "edit_form" }}
+{{ define "edit_form.html" }}
 <li id="todo-{{ .ID }}" class="flex items-center justify-between px-2 py-1 border-b">
   <form
     hx-put="/tasks/{{ .ID }}"
