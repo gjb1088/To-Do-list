@@ -52,10 +52,28 @@ func (h *Handler) buildViewData() viewData {
 
 // ServeIndex handles the initial GET "/" and renders the full layout (with one header).
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
-	data := h.buildViewData()
-	if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+    // 1) Grab the session and pull out the username (set in auth_handlers)
+    sess, _ := sessionStore.Get(r, sessionName)
+    username, _ := sess.Values["user"].(string)
+
+    // 2) Build your active/completed slices
+    vd := h.buildViewData()
+
+    // 3) Combine username + lists into one struct for the template
+    data := struct {
+        Username  string
+        Active    []*models.ToDo
+        Completed []*models.ToDo
+    }{
+        Username:  username,
+        Active:    vd.Active,
+        Completed: vd.Completed,
+    }
+
+    // 4) Render the shell + inner block
+    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
 }
 
 // CreateToDo handles POST /tasks. On htmx requests, re-renders only the inner "main" block.
