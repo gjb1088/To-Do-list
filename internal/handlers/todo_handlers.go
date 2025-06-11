@@ -50,6 +50,13 @@ func (h *Handler) buildViewData() viewData {
 	return viewData{Active: active, Completed: completed}
 }
 
+// right above your methods
+type pageData struct {
+    Username  string
+    Active    []*models.ToDo
+    Completed []*models.ToDo
+}
+
 // ServeIndex handles the initial GET "/" and renders the full layout (with one header).
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
     // 1) Grab the session and pull out the username (set in auth_handlers)
