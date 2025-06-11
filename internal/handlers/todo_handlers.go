@@ -1,4 +1,3 @@
-
 package handlers
 
 import (
@@ -10,87 +9,81 @@ import (
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
+// viewData holds exactly the two lists we need in our main block.
 type viewData struct {
-  Active    []*models.ToDo
-  Completed []*models.ToDo
+	Active    []*models.ToDo
+	Completed []*models.ToDo
 }
 
-// Handler holds the store and the parsed templates.
+// Handler bundles our store & templates.
 type Handler struct {
 	Store     *models.Store
 	Templates *template.Template
 }
 
-// NewHandler loads all templates (layout, index, partials) and returns a Handler.
+// NewHandler parses layout.html, index.html, and all partials into one Template.
 func NewHandler(store *models.Store) (*Handler, error) {
-	// 1) Load layout.html and index.html
+	// 1) parse layout.html + index.html
 	tmpl, err := template.ParseGlob(filepath.Join("internal", "templates", "*.html"))
 	if err != nil {
 		return nil, err
 	}
-
-	// 2) Then load all the partials (todo_item.html, todo_list.html, edit_form.html)
+	// 2) parse all partials (todo_item.html, todo_list.html, edit_form.html, etc.)
 	tmpl, err = tmpl.ParseGlob(filepath.Join("internal", "templates", "partials", "*.html"))
 	if err != nil {
 		return nil, err
 	}
-
-	return &Handler{
-		Store:     store,
-		Templates: tmpl,
-	}, nil
+	return &Handler{Store: store, Templates: tmpl}, nil
 }
 
-// ServeIndex renders layout.html (which pulls in the "main" block from index.html)
+// buildViewData splits todos into Active vs Completed.
+func (h *Handler) buildViewData() viewData {
+	all := h.Store.GetAll()
+	var active, completed []*models.ToDo
+	for _, t := range all {
+		if t.Completed {
+			completed = append(completed, t)
+		} else {
+			active = append(active, t)
+		}
+	}
+	return viewData{Active: active, Completed: completed}
+}
+
+// ServeIndex handles the initial GET "/" and renders the full layout (with one header).
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
-    all := h.Store.GetAll()
-    var active, completed []*models.ToDo
-    for _, t := range all {
-        if t.Completed {
-            completed = append(completed, t)
-        } else {
-            active = append(active, t)
-        }
-    }
-
-    data := struct {
-        Active    []*models.ToDo
-        Completed []*models.ToDo
-    }{
-        Active:    active,
-        Completed: completed,
-    }
-
-    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
+	data := h.buildViewData()
+	if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-// CreateToDo handles POST /tasks
+// CreateToDo handles POST /tasks. On htmx requests, re-renders only the inner "main" block.
 func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
-  // … parse form, create todo …
-  if r.Header.Get("HX-Request") == "true" {
-    // build the two lists
-    all := h.Store.GetAll()
-    var active, completed []*models.ToDo
-    for _, t := range all {
-      if t.Completed {
-        completed = append(completed, t)
-      } else {
-        active = append(active, t)
-      }
-    }
-    data := viewData{Active: active, Completed: completed}
-    // now re-render the entire #todoApp
-    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
-    return
-  }
-  http.Redirect(w, r, "/", http.StatusSeeOther)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	title := r.PostFormValue("title")
+	if title == "" {
+		http.Error(w, "title cannot be empty", http.StatusBadRequest)
+		return
+	}
+	h.Store.Create(title)
+
+	// If htmx, swap in only the updated main block.
+	if r.Header.Get("HX-Request") == "true" {
+		data := h.buildViewData()
+		if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	// Otherwise fallback to full reload.
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// DeleteToDo handles DELETE /tasks/{id}
+// DeleteToDo handles DELETE /tasks/{id}. htmx will remove the <li> via outerHTML.
 func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Path[len("/tasks/"):]
 	id, err := strconv.Atoi(idStr)
@@ -102,12 +95,10 @@ func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "todo not found", http.StatusNotFound)
 		return
 	}
-
-	// htmx will remove the <li> if we return 200 OK with empty body
 	w.WriteHeader(http.StatusOK)
 }
 
-// UpdateToDo handles PUT /tasks/{id}
+// UpdateToDo handles PUT /tasks/{id}. For checkbox toggles and clear, we re-render main.
 func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
@@ -119,28 +110,26 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-
 	title := r.PostFormValue("title")
 	completed := r.PostFormValue("completed") == "on"
 
-	updated, err := h.Store.Update(id, title, completed)
-	if err != nil {
+	if _, err := h.Store.Update(id, title, completed); err != nil {
 		http.Error(w, "todo not found", http.StatusNotFound)
 		return
 	}
 
-	// For htmx inline updates, return the new <li>
+	// If htmx, swap in only the updated main block.
 	if r.Header.Get("HX-Request") == "true" {
-		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
+		data := h.buildViewData()
+		if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
-
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// EditFormToDo handles GET /tasks/{id}/edit and returns the inline edit form <li>
+// EditFormToDo handles GET /tasks/{id}/edit and returns the edit form <li>.
 func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Path[len("/tasks/") : len(r.URL.Path)-len("/edit")]
 	id, err := strconv.Atoi(idStr)
@@ -153,13 +142,13 @@ func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "todo not found", http.StatusNotFound)
 		return
 	}
-
+	// Return only the edit_form.html snippet.
 	if err := h.Templates.ExecuteTemplate(w, "edit_form.html", todo); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// GetToDo handles GET /tasks/{id} and returns a single <li> for htmx swaps
+// GetToDo handles GET /tasks/{id} and returns the single <li> snippet.
 func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Path[len("/tasks/"):]
 	id, err := strconv.Atoi(idStr)
@@ -172,22 +161,16 @@ func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-
-	// Return just the <li> snippet
-	if r.Header.Get("HX-Request") == "true" {
-		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
+	if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// ClearCompleted handles DELETE /tasks/completed
+// ClearCompleted handles DELETE /tasks/completed and re-renders only the main block.
 func (h *Handler) ClearCompleted(w http.ResponseWriter, r *http.Request) {
-    h.Store.ClearCompleted()
-    // Return an empty <ul> so htmx will wipe out the list
-    w.Header().Set("Content-Type", "text/html")
-    w.Write([]byte(`<ul id="completedList"></ul>`))
+	h.Store.ClearCompleted()
+	data := h.buildViewData()
+	if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
