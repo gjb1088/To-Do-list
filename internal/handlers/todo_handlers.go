@@ -100,6 +100,7 @@ func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 
 // UpdateToDo handles PUT /tasks/{id} (toggle or inline edit)
 func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
+    // Parse form so we can see “completed” and “title” if present
     if err := r.ParseForm(); err != nil {
         http.Error(w, "invalid form", http.StatusBadRequest)
         return
@@ -111,15 +112,14 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Look up the old ToDo so we know its existing title
+    // Fetch the old ToDo so we can fall back to its title if none is provided
     old, err := h.Store.Get(id)
     if err != nil {
         http.Error(w, "todo not found", http.StatusNotFound)
         return
     }
 
-    // If the request included a new title (inline edit), use that.
-    // Otherwise (checkbox toggle) we keep the old title.
+    // Determine new title: if inline‐edit provided one, use it; otherwise keep old
     title := r.PostFormValue("title")
     if title == "" {
         title = old.Title
@@ -132,8 +132,16 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // For pure checkbox toggles (htmx), re-render the main block
+    // Handle htmx requests specially
     if r.Header.Get("HX-Request") == "true" {
+        // Inline‐edit save (title was provided) → return single <li> partial
+        if r.PostFormValue("title") != "" {
+            if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+            }
+            return
+        }
+        // Checkbox toggle → re-render the entire main block
         data := h.buildViewData()
         if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -141,14 +149,7 @@ func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // For inline edits, return only the single <li>
-    if r.Header.Get("HX-Request") == "true" {
-        if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-        return
-    }
-
+    // Non-htmx fallback: full-page redirect
     http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
