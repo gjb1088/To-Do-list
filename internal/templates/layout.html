@@ -7,9 +7,21 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- htmx -->
   <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+
+  <!-- optional: hide the “No active tasks” fallback once a real <li> appears -->
+  <style>
+    /* only works in modern browsers */
+    #activeList:has(li:not(.fallback)) > li.fallback {
+      display: none;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-900 flex flex-col items-center p-4">
   <h1 class="text-3xl font-bold mb-4">To-Do List</h1>
-  {{ block "main" . }}{{ end }}
+
+  <!-- New wrapper that htmx will target for full re-renders -->
+  <div id="todoApp" class="w-full max-w-md bg-white rounded shadow p-4">
+    {{ block "main" . }}{{ end }}
+  </div>
 </body>
 </html>
