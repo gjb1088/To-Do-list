@@ -98,36 +98,60 @@ func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// UpdateToDo handles PUT /tasks/{id}. For checkbox toggles and clear, we re-render main.
+// UpdateToDo handles PUT /tasks/{id} (toggle or inline edit)
 func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-	idStr := r.URL.Path[len("/tasks/"):]
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
-		return
-	}
-	title := r.PostFormValue("title")
-	completed := r.PostFormValue("completed") == "on"
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "invalid form", http.StatusBadRequest)
+        return
+    }
+    idStr := r.URL.Path[len("/tasks/"):]
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
 
-	if _, err := h.Store.Update(id, title, completed); err != nil {
-		http.Error(w, "todo not found", http.StatusNotFound)
-		return
-	}
+    // Look up the old ToDo so we know its existing title
+    old, err := h.Store.Get(id)
+    if err != nil {
+        http.Error(w, "todo not found", http.StatusNotFound)
+        return
+    }
 
-	// If htmx, swap in only the updated main block.
-	if r.Header.Get("HX-Request") == "true" {
-		data := h.buildViewData()
-		if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+    // If the request included a new title (inline edit), use that.
+    // Otherwise (checkbox toggle) we keep the old title.
+    title := r.PostFormValue("title")
+    if title == "" {
+        title = old.Title
+    }
+    completed := r.PostFormValue("completed") == "on"
+
+    updated, err := h.Store.Update(id, title, completed)
+    if err != nil {
+        http.Error(w, "todo not found", http.StatusNotFound)
+        return
+    }
+
+    // For pure checkbox toggles (htmx), re-render the main block
+    if r.Header.Get("HX-Request") == "true" {
+        data := h.buildViewData()
+        if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // For inline edits, return only the single <li>
+    if r.Header.Get("HX-Request") == "true" {
+        if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+        return
+    }
+
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+
 
 // EditFormToDo handles GET /tasks/{id}/edit and returns the edit form <li>.
 func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
