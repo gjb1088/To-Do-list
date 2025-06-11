@@ -7,9 +7,12 @@
   <div class="flex items-center">
     <input
       type="checkbox"
+      name="completed"
       {{ if .Completed }} checked {{ end }}
       class="mr-2"
       hx-put="/tasks/{{ .ID }}"
+      hx-trigger="change"
+      hx-include="closest li"
       hx-target="#todoApp"
       hx-swap="innerHTML"
     />
