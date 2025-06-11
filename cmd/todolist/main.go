@@ -10,6 +10,45 @@ import (
 )
 
 func main() {
+    // ToDo store
+    todoStore := models.NewStore()
+    todoH, err := handlers.NewHandler(todoStore)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // User store
+    userStore := models.NewUserStore()
+    // (Optionally seed one user)
+    userStore.Create("alice", "password123")
+
+    authH, err := handlers.NewAuthHandler(userStore)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Auth routes
+    http.HandleFunc("/login", func(w, r){ 
+        if r.Method=="GET"{authH.LoginPage(w,r)} else {authH.Login(w,r)} })
+    http.HandleFunc("/logout", authH.Logout)
+
+    // Protect everything else
+    protected := handlers.AuthRequired(http.DefaultServeMux)
+
+    // To-Do routes (mounted on default mux)
+    http.HandleFunc("/", todoH.ServeIndex)
+    http.HandleFunc("/tasks", todoH.CreateToDo)
+    // ... and all your other task routes ...
+
+    // Static files
+    fs := http.FileServer(http.Dir(filepath.Join("static")))
+    http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+    log.Println("Starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", protected))
+}
+
+func main() {
 	// Initialize the in-memory store
 	store := models.NewStore()
 
