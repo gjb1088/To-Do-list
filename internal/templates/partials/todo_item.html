@@ -10,9 +10,8 @@
       {{ if .Completed }} checked {{ end }}
       class="mr-2"
       hx-put="/tasks/{{ .ID }}"
-      hx-target="#todo-{{ .ID }}"
-      hx-include="closest li"
-      hx-swap="outerHTML"
+      hx-target="#todoApp"
+      hx-swap="innerHTML"
     />
     <span class="{{ if .Completed }} line-through text-gray-500 {{ end }}">
       {{ .Title }}
