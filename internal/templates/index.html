@@ -1,18 +1,25 @@
 {{ define "main" }}
 <div id="todoApp" class="w-full max-w-md bg-white rounded shadow p-4">
-
-  <!-- Active To-Do Form -->
-    <form
-        hx-post="/tasks"
-        hx-target="#todoApp"
-        hx-swap="innerHTML"
-        class="flex mb-4">
-    <input type="text" name="title" placeholder="What needs to be done?"
-           class="flex-1 border px-3 py-2 rounded-l" required>
-    <button type="submit" class="bg-blue-500 text-white px-4 rounded-r">Add</button>
+  <!-- Add form: now targets #todoApp and does outerHTML swap -->
+  <form
+    hx-post="/tasks"
+    hx-target="#todoApp"
+    hx-swap="outerHTML"
+    class="flex mb-4"
+  >
+    <input
+      type="text"
+      name="title"
+      placeholder="What needs to be done?"
+      class="flex-1 border rounded-l px-3 py-2"
+      required
+    />
+    <button type="submit" class="bg-blue-500 text-white px-4 rounded-r">
+      Add
+    </button>
   </form>
 
-  <!-- Active Tasks -->
+  <!-- Active Section -->
   <h2 class="text-xl font-semibold mb-2">Active</h2>
   <ul id="activeList">
     {{ if .Active }}
@@ -22,27 +29,24 @@
     {{ end }}
   </ul>
 
-  <!-- Completed Tasks -->
+  <!-- Completed Section -->
   <div class="mt-6">
     <h2 class="text-xl font-semibold mb-2">Completed 🎉</h2>
     <button
       hx-delete="/tasks/completed"
-      hx-target="#completedSection"
+      hx-target="#todoApp"
       hx-swap="outerHTML"
       class="mb-2 text-red-600 hover:text-red-800"
     >
       Delete All
     </button>
-    <div id="completedSection">
-      <ul id="completedList">
-        {{ if .Completed }}
-          {{ template "todo_completed_list.html" .Completed }}
-        {{ else }}
-          <li class="text-gray-500">No completed tasks.</li>
-        {{ end }}
-      </ul>
-    </div>
+    <ul id="completedList">
+      {{ if .Completed }}
+        {{ template "todo_completed_list.html" .Completed }}
+      {{ else }}
+        <li class="text-gray-500">No completed tasks.</li>
+      {{ end }}
+    </ul>
   </div>
-
 </div>
 {{ end }}
