@@ -67,14 +67,10 @@ func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
     vd := h.buildViewData()
 
     // 3) Combine username + lists into one struct for the template
-    data := struct {
-        Username  string
-        Active    []*models.ToDo
-        Completed []*models.ToDo
-    }{
-        Username:  username,
-        Active:    vd.Active,
-        Completed: vd.Completed,
+    data := pageData {
+        Username  username
+        Active    vd.Active
+        Completed vd.Completed,
     }
 
     // 4) Render the shell + inner block
