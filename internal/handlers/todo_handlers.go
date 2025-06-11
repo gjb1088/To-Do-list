@@ -9,6 +9,11 @@ import (
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
+type viewData struct {
+  Active    []*models.ToDo
+  Completed []*models.ToDo
+}
+
 // Handler holds the store and the parsed templates.
 type Handler struct {
 	Store     *models.Store
@@ -62,28 +67,26 @@ func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
 
 // CreateToDo handles POST /tasks
 func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-	title := r.PostFormValue("title")
-	if title == "" {
-		http.Error(w, "title cannot be empty", http.StatusBadRequest)
-		return
-	}
-
-	todo := h.Store.Create(title)
-
-	// If htmx, return only the <li> snippet
-	if r.Header.Get("HX-Request") == "true" {
-		if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-
-	// Otherwise full-page redirect
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+  // … parse form, create todo …
+  if r.Header.Get("HX-Request") == "true" {
+    // build the two lists
+    all := h.Store.GetAll()
+    var active, completed []*models.ToDo
+    for _, t := range all {
+      if t.Completed {
+        completed = append(completed, t)
+      } else {
+        active = append(active, t)
+      }
+    }
+    data := viewData{Active: active, Completed: completed}
+    // now re-render the entire #todoApp
+    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+    return
+  }
+  http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // DeleteToDo handles DELETE /tasks/{id}
