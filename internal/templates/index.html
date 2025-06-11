@@ -2,9 +2,10 @@
 <div id="todoApp" class="w-full max-w-md bg-white rounded shadow p-4">
 
   <!-- Active To-Do Form -->
-  <form hx-post="/tasks"
-        hx-target="#activeList"
-        hx-swap="afterbegin"
+    <form
+        hx-post="/tasks"
+        hx-target="#todoApp"
+        hx-swap="innerHTML"
         class="flex mb-4">
     <input type="text" name="title" placeholder="What needs to be done?"
            class="flex-1 border px-3 py-2 rounded-l" required>
