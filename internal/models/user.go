@@ -1,6 +1,9 @@
 package models
 
-import "golang.org/x/crypto/bcrypt"
+import (
+    "fmt"
+    "golang.org/x/crypto/bcrypt"
+)
 
 // User holds a single user’s data.
 type User struct {
