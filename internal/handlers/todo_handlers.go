@@ -9,6 +9,8 @@ import (
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
+)
+
 type pageData struct {
     Username  string
     Active    []*models.ToDo
@@ -23,23 +25,17 @@ func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
     // build active/completed lists
     vd := h.buildViewData()
 
-    // composite literal must have commas after every field!
+    // >>> Correct composite literal syntax: each field as Name: value, <<<
     data := pageData{
-        Username:  username,      // ← comma here
-        Active:    vd.Active,     // ← and here
-        Completed: vd.Completed,  // ← and here
+        Username:  username,
+        Active:    vd.Active,
+        Completed: vd.Completed,
     }
 
-    // full‐page render
+    // render your layout
     if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
-}
-
-// viewData holds exactly the two lists we need in our main block.
-type viewData struct {
-	Active    []*models.ToDo
-	Completed []*models.ToDo
 }
 
 // Handler bundles our store & templates.
