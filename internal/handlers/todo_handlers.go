@@ -9,49 +9,31 @@ import (
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
-)
-
+// pageData holds everything layout.html expects: the current user and both lists.
 type pageData struct {
-    Username  string
-    Active    []*models.ToDo
-    Completed []*models.ToDo
+	Username  string
+	Active    []*models.ToDo
+	Completed []*models.ToDo
 }
 
-func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
-    // pull username from the session
-    sess, _ := sessionStore.Get(r, sessionName)
-    username, _ := sess.Values["user"].(string)
-
-    // build active/completed lists
-    vd := h.buildViewData()
-
-    // >>> Correct composite literal syntax: each field as Name: value, <<<
-    data := pageData{
-        Username:  username,
-        Active:    vd.Active,
-        Completed: vd.Completed,
-    }
-
-    // render your layout
-    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
+// viewData just holds the two To-Do slices.
+type viewData struct {
+	Active    []*models.ToDo
+	Completed []*models.ToDo
 }
 
-// Handler bundles our store & templates.
+// Handler bundles the To-Do store and parsed templates.
 type Handler struct {
 	Store     *models.Store
 	Templates *template.Template
 }
 
-// NewHandler parses layout.html, index.html, and all partials into one Template.
+// NewHandler parses layout/index + all partials into one *template.Template.
 func NewHandler(store *models.Store) (*Handler, error) {
-	// 1) parse layout.html + index.html
 	tmpl, err := template.ParseGlob(filepath.Join("internal", "templates", "*.html"))
 	if err != nil {
 		return nil, err
 	}
-	// 2) parse all partials (todo_item.html, todo_list.html, edit_form.html, etc.)
 	tmpl, err = tmpl.ParseGlob(filepath.Join("internal", "templates", "partials", "*.html"))
 	if err != nil {
 		return nil, err
@@ -59,7 +41,7 @@ func NewHandler(store *models.Store) (*Handler, error) {
 	return &Handler{Store: store, Templates: tmpl}, nil
 }
 
-// buildViewData splits todos into Active vs Completed.
+// buildViewData splits all To-Dos into Active vs Completed.
 func (h *Handler) buildViewData() viewData {
 	all := h.Store.GetAll()
 	var active, completed []*models.ToDo
@@ -73,36 +55,30 @@ func (h *Handler) buildViewData() viewData {
 	return viewData{Active: active, Completed: completed}
 }
 
-// right above your methods
-type pageData struct {
-    Username  string
-    Active    []*models.ToDo
-    Completed []*models.ToDo
-}
-
-// ServeIndex handles the initial GET "/" and renders the full layout (with one header).
+// ServeIndex handles GET "/" – pulls the username from the session + both lists,
+// then renders layout.html (which calls your main block).
 func (h *Handler) ServeIndex(w http.ResponseWriter, r *http.Request) {
-    // 1) Grab the session and pull out the username (set in auth_handlers)
-    sess, _ := sessionStore.Get(r, sessionName)
-    username, _ := sess.Values["user"].(string)
+	// 1) Get the signed-in username from the session.
+	sess, _ := sessionStore.Get(r, sessionName)
+	username, _ := sess.Values["user"].(string)
 
-    // 2) Build your active/completed slices
-    vd := h.buildViewData()
+	// 2) Build the two lists.
+	vd := h.buildViewData()
 
-    // 3) Combine username + lists into one struct for the template
-    data := pageData {
-        Username  username
-        Active    vd.Active
-        Completed vd.Completed,
-    }
+	// 3) Combine into the full pageData.
+	data := pageData{
+		Username:  username,
+		Active:    vd.Active,
+		Completed: vd.Completed,
+	}
 
-    // 4) Render the shell + inner block
-    if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
+	// 4) Render the full shell (layout.html with its main block).
+	if err := h.Templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-// CreateToDo handles POST /tasks. On htmx requests, re-renders only the inner "main" block.
+// CreateToDo handles POST /tasks. If htmx, re-renders only the main block.
 func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form", http.StatusBadRequest)
@@ -115,22 +91,17 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Store.Create(title)
 
-	// If htmx, swap in only the updated main block.
 	if r.Header.Get("HX-Request") == "true" {
-		data := h.buildViewData()
-		if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		data := h.composePageData(r)
+		h.Templates.ExecuteTemplate(w, "main", data)
 		return
 	}
-	// Otherwise fallback to full reload.
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // DeleteToDo handles DELETE /tasks/{id}. htmx will remove the <li> via outerHTML.
 func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Path[len("/tasks/"):]
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(r.URL.Path[len("/tasks/"):])
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
@@ -142,66 +113,53 @@ func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// UpdateToDo handles PUT /tasks/{id} (toggle or inline edit)
+// UpdateToDo handles PUT /tasks/{id}. Distinguishes inline-edit vs checkbox toggle.
 func (h *Handler) UpdateToDo(w http.ResponseWriter, r *http.Request) {
-    // Parse form so we can see “completed” and “title” if present
-    if err := r.ParseForm(); err != nil {
-        http.Error(w, "invalid form", http.StatusBadRequest)
-        return
-    }
-    idStr := r.URL.Path[len("/tasks/"):]
-    id, err := strconv.Atoi(idStr)
-    if err != nil {
-        http.Error(w, "invalid id", http.StatusBadRequest)
-        return
-    }
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(r.URL.Path[len("/tasks/"):])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	// Fetch old for title fallback
+	old, err := h.Store.Get(id)
+	if err != nil {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+	// Title from form if present, else old.Title
+	title := r.PostFormValue("title")
+	if title == "" {
+		title = old.Title
+	}
+	completed := r.PostFormValue("completed") == "on"
 
-    // Fetch the old ToDo so we can fall back to its title if none is provided
-    old, err := h.Store.Get(id)
-    if err != nil {
-        http.Error(w, "todo not found", http.StatusNotFound)
-        return
-    }
+	updated, err := h.Store.Update(id, title, completed)
+	if err != nil {
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
 
-    // Determine new title: if inline‐edit provided one, use it; otherwise keep old
-    title := r.PostFormValue("title")
-    if title == "" {
-        title = old.Title
-    }
-    completed := r.PostFormValue("completed") == "on"
-
-    updated, err := h.Store.Update(id, title, completed)
-    if err != nil {
-        http.Error(w, "todo not found", http.StatusNotFound)
-        return
-    }
-
-    // Handle htmx requests specially
-    if r.Header.Get("HX-Request") == "true" {
-        // Inline‐edit save (title was provided) → return single <li> partial
-        if r.PostFormValue("title") != "" {
-            if err := h.Templates.ExecuteTemplate(w, "todo_item.html", updated); err != nil {
-                http.Error(w, err.Error(), http.StatusInternalServerError)
-            }
-            return
-        }
-        // Checkbox toggle → re-render the entire main block
-        data := h.buildViewData()
-        if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-        }
-        return
-    }
-
-    // Non-htmx fallback: full-page redirect
-    http.Redirect(w, r, "/", http.StatusSeeOther)
+	if r.Header.Get("HX-Request") == "true" {
+		// Inline-edit (title present) → single <li>
+		if r.PostFormValue("title") != "" {
+			h.Templates.ExecuteTemplate(w, "todo_item.html", updated)
+			return
+		}
+		// Checkbox toggle → re-render main block
+		data := h.composePageData(r)
+		h.Templates.ExecuteTemplate(w, "main", data)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-
-// EditFormToDo handles GET /tasks/{id}/edit and returns the edit form <li>.
+// EditFormToDo handles GET /tasks/{id}/edit → returns the edit_form.html snippet.
 func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Path[len("/tasks/") : len(r.URL.Path)-len("/edit")]
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(r.URL.Path[len("/tasks/") : len(r.URL.Path)-len("/edit")])
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
@@ -211,16 +169,12 @@ func (h *Handler) EditFormToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "todo not found", http.StatusNotFound)
 		return
 	}
-	// Return only the edit_form.html snippet.
-	if err := h.Templates.ExecuteTemplate(w, "edit_form.html", todo); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	h.Templates.ExecuteTemplate(w, "edit_form.html", todo)
 }
 
-// GetToDo handles GET /tasks/{id} and returns the single <li> snippet.
+// GetToDo handles GET /tasks/{id} → returns the todo_item.html snippet.
 func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Path[len("/tasks/"):]
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(r.URL.Path[len("/tasks/"):])
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
@@ -230,16 +184,25 @@ func (h *Handler) GetToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	if err := h.Templates.ExecuteTemplate(w, "todo_item.html", todo); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	h.Templates.ExecuteTemplate(w, "todo_item.html", todo)
 }
 
-// ClearCompleted handles DELETE /tasks/completed and re-renders only the main block.
+// ClearCompleted handles DELETE /tasks/completed → re-renders only the main block.
 func (h *Handler) ClearCompleted(w http.ResponseWriter, r *http.Request) {
 	h.Store.ClearCompleted()
-	data := h.buildViewData()
-	if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	data := h.composePageData(r)
+	h.Templates.ExecuteTemplate(w, "main", data)
+}
+
+// composePageData is an internal helper to pull username + lists for htmx swaps.
+func (h *Handler) composePageData(r *http.Request) pageData {
+	// session + username
+	sess, _ := sessionStore.Get(r, sessionName)
+	username, _ := sess.Values["user"].(string)
+	vd := h.buildViewData()
+	return pageData{
+		Username:  username,
+		Active:    vd.Active,
+		Completed: vd.Completed,
 	}
 }
