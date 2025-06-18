@@ -21,7 +21,7 @@ var ErrNotFound = errors.New("todo not found")
 // Store provides thread-safe access to to-do items in memory.
 type Store struct {
 	sync.RWMutex
-	todos map[int]*ToDo
+	todos  map[int]*ToDo
 	nextID int
 }
 
@@ -104,11 +104,11 @@ func (s *Store) Delete(id int) error {
 
 // ClearCompleted removes all tasks where Completed==true.
 func (s *Store) ClearCompleted() {
-    s.Lock()
-    defer s.Unlock()
-    for id, todo := range s.todos {
-        if todo.Completed {
-            delete(s.todos, id)
-        }
-    }
+	s.Lock()
+	defer s.Unlock()
+	for id, todo := range s.todos {
+		if todo.Completed {
+			delete(s.todos, id)
+		}
+	}
 }
