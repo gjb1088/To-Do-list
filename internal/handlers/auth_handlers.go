@@ -68,3 +68,29 @@ func AuthRequired(next http.Handler) http.Handler {
         next.ServeHTTP(w, r)
     })
 }
+
+// RegisterPage handles GET /register and shows the register form.
+func (a *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
+    a.Templates.ExecuteTemplate(w, "register.html", nil)
+}
+
+// Register handles POST /register and creates a new user.
+func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "invalid form", http.StatusBadRequest)
+        return
+    }
+    username := r.FormValue("username")
+    password := r.FormValue("password")
+    if username == "" || password == "" {
+        http.Error(w, "username & password required", http.StatusBadRequest)
+        return
+    }
+    if err := a.Users.Create(username, password); err != nil {
+        // you might want to show a nicer error page instead
+        http.Error(w, "user already exists", http.StatusConflict)
+        return
+    }
+    // After successful registration, redirect to login
+    http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
