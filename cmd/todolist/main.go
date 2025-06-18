@@ -45,6 +45,16 @@ func main() {
 	})
 	mux.HandleFunc("/logout", authH.Logout)
 
+	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+   		if r.Method == http.MethodGet {
+        		authH.RegisterPage(w, r)
+ 	   	} else if r.Method == http.MethodPost {
+        		authH.Register(w, r)
+    		} else {
+        		http.NotFound(w, r)
+    		}
+	})	
+
 	// Protected To-Do routes
 	mux.Handle("/", handlers.AuthRequired(http.HandlerFunc(todoH.ServeIndex)))
 
