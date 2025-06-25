@@ -21,7 +21,7 @@ type AuthHandler struct {
 }
 
 // NewAuthHandler loads auth templates (login.html, register.html)
-func NewAuthHandler(users *models.UserStore) (*AuthHandler, error) {
+func NewAuthHandler(us UserStore) (*AuthHandler, error)  {
     tmpl, err := template.ParseGlob("internal/templates/auth/*.html")
     if err != nil {
         return nil, err
