@@ -16,17 +16,17 @@ var (
 
 // AuthHandler holds user store + templates
 type AuthHandler struct {
-    Users     *models.UserStore
+    Users     models.UserStore
     Templates *template.Template
 }
 
 // NewAuthHandler loads auth templates (login.html, register.html)
-func NewAuthHandler(us UserStore) (*AuthHandler, error)  {
+func NewAuthHandler(us models.UserStore) (*AuthHandler, error) {
     tmpl, err := template.ParseGlob("internal/templates/auth/*.html")
     if err != nil {
         return nil, err
     }
-    return &AuthHandler{Users: users, Templates: tmpl}, nil
+    return &AuthHandler{userStore: us, Templates: tmpl}, nil
 }
 
 // LoginPage GET /login
@@ -39,7 +39,7 @@ func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
     user := r.FormValue("username")
     pass := r.FormValue("password")
-    if a.Users.Authenticate(user, pass) {
+    if a.userStore.Authenticate(user, pass) {
         sess, _ := sessionStore.Get(r, sessionName)
         sess.Values["user"] = user
         sess.Save(r, w)
@@ -86,7 +86,7 @@ func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "username & password required", http.StatusBadRequest)
         return
     }
-    if err := a.Users.Create(username, password); err != nil {
+    if err := a.userStore.Create(username, password); err != nil {
         // you might want to show a nicer error page instead
         http.Error(w, "user already exists", http.StatusConflict)
         return
