@@ -29,7 +29,7 @@ type Handler struct {
 }
 
 // NewHandler parses layout/index + all partials into one *template.Template.
-func NewHandler(store *models.Store) (*Handler, error) {
+func NewHandlerWithStore(store ToDoStore) (*Handler, error) {
 	tmpl, err := template.ParseGlob(filepath.Join("internal", "templates", "*.html"))
 	if err != nil {
 		return nil, err
