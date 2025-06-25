@@ -6,33 +6,39 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/gjb1088/To-Do-list/internal/handlers"
 	"github.com/gjb1088/To-Do-list/internal/models"
 )
 
 func main() {
-	// --- 1) Set up stores & handlers ---
-
-	// To-Do store & handler
-	todoStore := models.NewStore()
-	todoH, err := handlers.NewHandler(todoStore)
+	// 1) Connect to Postgres
+	db, err := sqlx.Connect(
+		"pgx",
+		"postgres://todoapp:secretpass@localhost:5432/todoapp?sslmode=disable",
+	)
 	if err != nil {
-		log.Fatalf("failed to parse To-Do templates: %v", err)
+		log.Fatalf("DB connect failed: %v", err)
 	}
+	defer db.Close()
 
-	// User store & handler
-	userStore := models.NewUserStore()
-	// seed a user
-	if err := userStore.Create("alice", "password123"); err != nil {
-		log.Fatalf("failed to create user: %v", err)
-	}
+	// 2) Create Postgres-backed stores
+	userStore := models.NewUserStorePostgres(db)
+	todoStore := models.NewStorePostgres(db)
+
+	// 3) Build handlers
 	authH, err := handlers.NewAuthHandler(userStore)
 	if err != nil {
 		log.Fatalf("failed to parse auth templates: %v", err)
 	}
+	todoH, err := handlers.NewHandlerWithStore(todoStore)
+	if err != nil {
+		log.Fatalf("failed to parse To-Do templates: %v", err)
+	}
 
-	// --- 2) Build a new ServeMux and register routes ---
-
+	// 4) Register routes on a fresh ServeMux
 	mux := http.NewServeMux()
 
 	// Unprotected auth routes
@@ -44,16 +50,15 @@ func main() {
 		}
 	})
 	mux.HandleFunc("/logout", authH.Logout)
-
 	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
-   		if r.Method == http.MethodGet {
-        		authH.RegisterPage(w, r)
- 	   	} else if r.Method == http.MethodPost {
-        		authH.Register(w, r)
-    		} else {
-        		http.NotFound(w, r)
-    		}
-	})	
+		if r.Method == http.MethodGet {
+			authH.RegisterPage(w, r)
+		} else if r.Method == http.MethodPost {
+			authH.Register(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
 
 	// Protected To-Do routes
 	mux.Handle("/", handlers.AuthRequired(http.HandlerFunc(todoH.ServeIndex)))
@@ -67,16 +72,20 @@ func main() {
 	})))
 
 	mux.Handle("/tasks/", handlers.AuthRequired(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path // e.g. "/tasks/3", "/tasks/3/edit"
+		path := r.URL.Path
 		switch {
 		case r.Method == http.MethodGet && len(path) > len("/tasks/") && strings.HasSuffix(path, "/edit"):
 			todoH.EditFormToDo(w, r)
+
 		case r.Method == http.MethodGet && len(path) > len("/tasks/"):
 			todoH.GetToDo(w, r)
+
 		case r.Method == http.MethodPut && len(path) > len("/tasks/"):
 			todoH.UpdateToDo(w, r)
+
 		case r.Method == http.MethodDelete && len(path) > len("/tasks/"):
 			todoH.DeleteToDo(w, r)
+
 		default:
 			http.NotFound(w, r)
 		}
@@ -94,8 +103,7 @@ func main() {
 	fs := http.FileServer(http.Dir(filepath.Join("static")))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	// --- 3) Start the server ---
-
+	// 5) Launch!
 	log.Println("Starting server on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
