@@ -11,6 +11,9 @@ type ToDo struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
+// ErrNotFound is returned when a to-do item doesn’t exist.
+var ErrNotFound = errors.New("todo not found")
+
 // UserStore abstracts how we create/authenticate users.
 type UserStore interface {
 	Create(username, password string) error
