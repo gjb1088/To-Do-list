@@ -8,14 +8,12 @@ type UserStore interface {
 
 // ToDoStore abstracts how we CRUD todos for a given user.
 type ToDoStore interface {
-    // List all to-dos for this username
+    // fetch all to-dos for this user
     GetAll(username string) ([]*ToDo, error)
-    // Create a new to-do, return the record
+    // fetch one by ID+user
+    Get(id int, username string) (*ToDo, error)
     Create(username, title string) (*ToDo, error)
-    // Update title/completed for a given ID (and username)
     Update(id int, title string, completed bool, username string) (*ToDo, error)
-    // Delete by ID (and username)
     Delete(id int, username string) error
-    // Remove all completed for this username
     ClearCompleted(username string) error
 }
