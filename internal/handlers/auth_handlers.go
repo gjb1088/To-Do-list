@@ -26,7 +26,10 @@ func NewAuthHandler(us models.UserStore) (*AuthHandler, error) {
     if err != nil {
         return nil, err
     }
-    return &AuthHandler{userStore: us, Templates: tmpl}, nil
+    return &AuthHandler{
+        userStore: us, 
+        Templates: tmpl,
+    }, nil
 }
 
 // LoginPage GET /login
