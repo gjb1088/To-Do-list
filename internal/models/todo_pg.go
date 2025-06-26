@@ -14,12 +14,12 @@ func NewStorePostgres(db *sqlx.DB) *StorePostgres {
 	return &StorePostgres{db: db}
 }
 
-// GetAll returns every to‐do belonging to the given user.
+// GetAll returns every to-do belonging to the given user.
 func (s *StorePostgres) GetAll(username string) ([]*ToDo, error) {
-	var todos []*ToDo
+	todos := []*ToDo{}
 	err := s.db.Select(
 		&todos,
-		`SELECT id, title, completed
+		`SELECT id, title, completed, created_at, updated_at
 		   FROM todos
 		  WHERE username = $1
 		  ORDER BY id`,
@@ -28,12 +28,12 @@ func (s *StorePostgres) GetAll(username string) ([]*ToDo, error) {
 	return todos, err
 }
 
-// Get fetches a single to‐do by ID and username.
+// Get fetches a single to-do by ID and username.
 func (s *StorePostgres) Get(id int, username string) (*ToDo, error) {
 	var todo ToDo
 	err := s.db.Get(
 		&todo,
-		`SELECT id, title, completed
+		`SELECT id, title, completed, created_at, updated_at
 		   FROM todos
 		  WHERE id = $1
 		    AND username = $2`,
@@ -45,7 +45,7 @@ func (s *StorePostgres) Get(id int, username string) (*ToDo, error) {
 	return &todo, nil
 }
 
-// Create inserts a new to‐do for this user and returns the created record.
+// Create inserts a new to-do for this user and returns the created record.
 func (s *StorePostgres) Create(username, title string) (*ToDo, error) {
 	var id int
 	err := s.db.QueryRowx(
@@ -60,12 +60,13 @@ func (s *StorePostgres) Create(username, title string) (*ToDo, error) {
 	return &ToDo{ID: id, Title: title, Completed: false}, nil
 }
 
-// Update changes the title and/or completed‐flag of an existing to‐do.
+// Update changes the title and/or completed-flag of an existing to-do.
 func (s *StorePostgres) Update(id int, title string, completed bool, username string) (*ToDo, error) {
 	_, err := s.db.Exec(
 		`UPDATE todos
 		    SET title     = $1,
-		        completed = $2
+		        completed = $2,
+		        updated_at= NOW()
 		  WHERE id       = $3
 		    AND username = $4`,
 		title, completed, id, username,
@@ -76,7 +77,7 @@ func (s *StorePostgres) Update(id int, title string, completed bool, username st
 	return &ToDo{ID: id, Title: title, Completed: completed}, nil
 }
 
-// Delete removes a to‐do by ID (scoped to the signed‐in user).
+// Delete removes a to-do by ID (scoped to the signed-in user).
 func (s *StorePostgres) Delete(id int, username string) error {
 	_, err := s.db.Exec(
 		`DELETE FROM todos
@@ -87,7 +88,7 @@ func (s *StorePostgres) Delete(id int, username string) error {
 	return err
 }
 
-// ClearCompleted deletes all “completed = TRUE” rows for that user.
+// ClearCompleted deletes all completed rows for that user.
 func (s *StorePostgres) ClearCompleted(username string) error {
 	_, err := s.db.Exec(
 		`DELETE FROM todos
