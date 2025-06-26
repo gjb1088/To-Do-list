@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+    "errors"
+    "time"
+)	
 
 // ToDo is your database model for a single task.
 type ToDo struct {
