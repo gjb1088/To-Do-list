@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 
 	"github.com/gjb1088/To-Do-list/internal/handlers"
 	"github.com/gjb1088/To-Do-list/internal/models"
