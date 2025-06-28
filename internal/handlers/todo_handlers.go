@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -98,6 +99,9 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create todo", http.StatusInternalServerError)
 		return
 	}
+
+	// —— DEBUG LOGGING ——
+        log.Printf("[DEBUG] CreateToDo: created %+v for user=%q\n", newTodo, user)
 
 	// 3) If HTMX, re-render the <div id="todoApp">…</div> by firing the "main" template
 	if r.Header.Get("HX-Request") == "true" {
