@@ -93,12 +93,13 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2) Create under the current user
-	user := h.currentUser(r)
-	if _, err := h.store.Create(user, title); err != nil {
-		http.Error(w, "could not create todo", http.StatusInternalServerError)
-		return
-	}
+	// 2) Create under the current user, capturing newTodo
+    user := h.currentUser(r)
+    newTodo, err := h.store.Create(user, title)
+    if err != nil {
+        http.Error(w, "could not create todo", http.StatusInternalServerError)
+        return
+    }
 
 	// —— DEBUG LOGGING ——
         log.Printf("[DEBUG] CreateToDo: created %+v for user=%q\n", newTodo, user)
