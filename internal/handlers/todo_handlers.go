@@ -54,16 +54,31 @@ func (h *Handler) currentUser(r *http.Request) string {
 
 // buildViewData fetches all todos for this user and splits into active/completed.
 func (h *Handler) buildViewData(username string) viewData {
-	all, _ := h.store.GetAll(username)
-	var active, completed []*models.ToDo
-	for _, t := range all {
-		if t.Completed {
-			completed = append(completed, t)
-		} else {
-			active = append(active, t)
-		}
-	}
-	return viewData{Active: active, Completed: completed}
+    // 1) fetch the rows and catch any error
+    todos, err := h.store.GetAll(username)
+    if err != nil {
+        log.Printf("[ERROR] buildViewData failed for user=%q: %v", username, err)
+        // we still return an empty viewData so the handler doesn't panic
+        return viewData{}
+    }
+
+    // 2) split into active vs completed
+    var active, completed []*models.ToDo
+    for _, t := range todos {
+        if t.Completed {
+            completed = append(completed, t)
+        } else {
+            active = append(active, t)
+        }
+    }
+
+    // 3) debug‐log exactly what you’ll render
+    log.Printf(
+        "[DEBUG] buildViewData → Active=%d Completed=%d for user=%q\n",
+        len(active), len(completed), username,
+    )
+
+    return viewData{Active: active, Completed: completed}
 }
 
 // ServeIndex handles GET "/" and renders the full page (using layout.html).
