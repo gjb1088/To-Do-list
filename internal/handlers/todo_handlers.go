@@ -93,7 +93,7 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2) Create under the current user, capturing newTodo
+  // 2) Create under the current user, capturing the new record
     user := h.currentUser(r)
     newTodo, err := h.store.Create(user, title)
     if err != nil {
@@ -101,27 +101,31 @@ func (h *Handler) CreateToDo(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-	// —— DEBUG LOGGING ——
-        log.Printf("[DEBUG] CreateToDo: created %+v for user=%q\n", newTodo, user)
+    // —— DEBUG LOGGING ——
+    log.Printf("[DEBUG] CreateToDo: created %+v for user=%q\n", newTodo, user)
 
-	// 3) If HTMX, re-render the <div id="todoApp">…</div> by firing the "main" template
-	if r.Header.Get("HX-Request") == "true" {
-		vd := h.buildViewData(user)
-		data := pageData{
-			Username:  user,
-			Active:    vd.Active,
-			Completed: vd.Completed,
-		}
-		if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
+    // 3) If HTMX, re-render the <div id="todoApp">…</div> by firing the "main" template
+    if r.Header.Get("HX-Request") == "true" {
+        vd := h.buildViewData(user)
+        log.Printf("[DEBUG] buildViewData → Active=%d, Completed=%d", len(vd.Active), len(vd.Completed))
+        for i, t := range vd.Active {
+            log.Printf("[DEBUG]   active[%d]: %+v", i, t)
+        }
 
-	// 4) Fallback: full redirect
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+        data := pageData{
+            Username:  user,
+            Active:    vd.Active,
+            Completed: vd.Completed,
+        }
+        if err := h.Templates.ExecuteTemplate(w, "main", data); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
+        return
+    }
+
+    // 4) Fallback: full redirect
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
-
 // DeleteToDo handles DELETE "/tasks/{id}" and simply returns 200 OK on HTMX so
 // htmx will remove the <li> for you.
 func (h *Handler) DeleteToDo(w http.ResponseWriter, r *http.Request) {
