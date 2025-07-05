@@ -12,6 +12,6 @@ CREATE TABLE IF NOT EXISTS todos (
   title     TEXT       NOT NULL,
   completed BOOLEAN    NOT NULL DEFAULT FALSE,
   username  TEXT       NOT NULL REFERENCES users(username)
-  created_at TIMESTAMPZ NOT NULL DEFAULT now()
-  updated_at TIMESTAMPZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
