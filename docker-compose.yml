@@ -12,5 +12,18 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: always
+    environment:
+      # pick any email / password you like:
+      PGADMIN_DEFAULT_EMAIL: georgeburnite@burnthe.network
+      PGADMIN_DEFAULT_PASSWORD: HelloThere1088!
+    ports:
+      # host-port:container-port
+      - "8081:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
 volumes:
   pgdata:
